@@ -1,0 +1,122 @@
+<h2>簡易網頁錄音機</h2>
+
+<button id="startBtn">開始錄音</button>
+<button id="stopBtn" disabled>停止錄音</button>
+
+<br><br>
+
+<audio id="audioPlayback" controls></audio>
+
+<script>
+    let mediaRecorder;
+    let audioChunks = [];
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const audioPlayback = document.getElementById('audioPlayback');
+
+    // 開始錄音
+    startBtn.onclick = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true
+            });
+
+            // 使用瀏覽器支援的錄音格式
+            let mimeType = 'audio/webm';
+
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                mimeType = 'audio/ogg';
+            }
+
+            mediaRecorder = new MediaRecorder(stream, {
+                mimeType: mimeType
+            });
+
+            audioChunks = [];
+
+            // 收集錄音資料
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            // 錄音停止
+            mediaRecorder.onstop = async () => {
+
+                const audioBlob = new Blob(audioChunks, {
+                    type: mimeType
+                });
+
+                // 播放錄音
+                const audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayback.src = audioUrl;
+
+                // 建立 FormData
+                const formData = new FormData();
+
+                formData.append(
+                    'audio',
+                    audioBlob,
+                    'recording.webm'
+                );
+
+                try {
+                    // POST 到 Flask
+                    const response = await fetch('http://127.0.0.1:5000/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    console.log(result);
+
+                    if (response.ok) {
+                        alert('錄音上傳成功！');
+                    } else {
+                        alert('上傳失敗：' + result.message);
+                    }
+
+                } catch (error) {
+                    console.error('上傳錯誤：', error);
+                    alert('無法連線到 Flask');
+                }
+
+                // 關閉麥克風
+                mediaRecorder.stream.getTracks().forEach(track => {
+                    track.stop();
+                });
+
+                audioChunks = [];
+            };
+
+            // 開始錄音
+            mediaRecorder.start();
+
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+
+            console.log('開始錄音');
+
+        } catch (err) {
+            console.error(err);
+            alert('無法存取麥克風，請確認權限已開啟！');
+        }
+    };
+
+
+    // 停止錄音
+    stopBtn.onclick = () => {
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+
+        console.log('停止錄音');
+    };
+</script>
