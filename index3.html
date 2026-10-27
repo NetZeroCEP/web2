@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        /* 選單 */
+        #menu {
+            padding: 15px;
+            background-color: #f5f5f5;
+        }
+
+        select {
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        /* 地圖 */
+        #map {
+            width: 100%;
+            height: 600px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>辨識青蛙種類聲音</h2>
+
+    <button id="startBtn">開始錄音</button>
+    <button id="stopBtn" disabled>停止錄音</button>
+
+    <br><br>
+
+    <audio id="audioPlayback" controls></audio>
+
+    <div id="resultBox" style="margin-top: 20px;">
+        <h3>辨識結果</h3>
+        <p hidden> <strong>檔案名稱：</strong> <span id="filename"></span> </p>
+        <p hidden> <strong>訊息：</strong> <span id="message"></span> </p>
+        <h2 id="result"></h2>
+    </div>
+    <div id="menu">
+
+        <label>
+            類別：
+        </label>
+
+        <select id="categorySelect">
+
+            <option value="">
+                請選擇
+            </option>
+
+            <!-- <option value="A">
+                A
+            </option>
+
+            <option value="B">
+                B
+            </option> -->
+
+        </select>
+        <div style="display: inline-block;">
+            <button onclick="getLocation()">取得我的位置</button>
+            <p id="demo" hidden></p>
+        </div>
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- 地圖 -->
+    <!-- ============================= -->
+
+    <div id="map"></div>
+
+
+    <!-- Leaflet JS -->
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    </script>
+    <script>
+        let locations = {};
+        let lat = 0.0 // 緯度
+        let lon = 0.0
+        const x = document.getElementById("demo");
+        const size = 10;
+        const map = L.map('map').setView(
+            [22.55, 120.55],
+            10
+        );
+        const markers = {};
+        L.tileLayer(
+            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            {
+                attribution:
+                    '&copy; OpenStreetMap contributors'
+            }
+        ).addTo(map);
+        const markerIcons = {
+
+            // 紅色
+            red: L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        width: ${size}px;
+                        height: ${size}px;
+                        background: red;
+                        border-radius: 50%;
+                        border: 0px solid white;
+                        box-shadow: 0 0 5px #555;
+                    "></div>
+                `,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+            }),
+
+
+            // 藍色
+            blue: L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        width: 10px;
+                        height: 10px;
+                        background: blue;
+                        border-radius: 50%;
+                        border: 0px solid white;
+                        box-shadow: 0 0 5px #555;
+                    "></div>
+                `,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+            }),
+
+
+            // 綠色
+            green: L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        width: ${size}px;
+                        height: ${size}px;
+                        background: green;
+                        border-radius: 50%;
+                        border: 0px solid white;
+                        box-shadow: 0 0 5px #555;
+                    "></div>
+                `,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+            }),
+
+
+            // 橘色
+            orange: L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        width: ${size}px;
+                        height: ${size}px;
+                        background: orange;
+                        border-radius: 50%;
+                        border: 0px solid white;
+                        box-shadow: 0 0 5px #555;
+                    "></div>
+                `,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+            }),
+
+
+            // 紫色
+            purple: L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        width: ${size}px;
+                        height: ${size}px;
+                        background: purple;
+                        border-radius: 50%;
+                        border: 0px solid white;
+                        box-shadow: 0 0 5px #555;
+                    "></div>
+                `,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+            })
+
+        };
+        function creatMarker(locations) {
+
+            Object.keys(locations).forEach(
+                category => {
+
+                    locations[category].forEach(
+                        location => {
+                            const icon =
+                                markerIcons[location.markerType]
+                                || markerIcons.red;
+                            const marker = L.marker(
+                                [
+                                    location.lat,
+                                    location.lon
+                                ],
+                                {
+                                    icon: icon
+                                }
+                            );
+                            marker.bindPopup(`
+
+                            <b>
+                                ${location.classes}
+                            </b>
+
+                            <br><br>
+
+                            緯度：
+                            ${location.lat}
+
+                            <br>
+
+                            經度：
+                            ${location.lon}
+
+                            <br>
+
+                            Marker：
+                            ${location.markerType}
+
+                        `);
+                            markers[location.id] =
+                                marker;
+
+                        }
+                    );
+
+                }
+            );
+
+
+        }
+        function clearMarkers() {
+
+            Object.values(markers).forEach(
+                marker => {
+
+                    if (map.hasLayer(marker)) {
+
+                        map.removeLayer(marker);
+
+                    }
+
+                }
+            );
+
+        }
+        function showCategory(category) {
+            clearMarkers();
+            if (!category) {
+
+                return;
+
+            }
+            const data =
+                locations[category];
+
+
+            if (!data) {
+
+                return;
+
+            }
+            data.forEach(
+                location => {
+
+                    const marker =
+                        markers[location.id];
+
+                    marker.addTo(map);
+
+                }
+            );
+
+        }
+        const categorySelect =
+            document.getElementById(
+                "categorySelect"
+            );
+
+
+        categorySelect.addEventListener("change", async function () {
+
+            const category = this.value;
+
+            try {
+
+                const res = await fetch(
+                    `${URL_1}/query?classes=${encodeURIComponent(category)}`,
+                    {
+                        method: "GET",
+                        cache: "no-store",
+                        headers: {
+                            "ngrok-skip-browser-warning": "69420"
+                        }
+                    }
+                );
+
+                const data = await res.json();
+
+                locations[category] = data;
+
+                console.log("locations:", locations);
+
+                creatMarker({
+                    [category]: data
+                });
+
+                showCategory(category);
+
+            } catch (error) {
+
+                console.error("發生錯誤：", error);
+
+            }
+
+        });
+        function getLocation() {
+            if (navigator.geolocation) {
+                // 取得目前位置
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                x.innerHTML = "您的瀏覽器不支援地理定位功能。";
+            }
+        }
+
+        function showPosition(position) {
+            lat = position.coords.latitude;  // 緯度
+            lon = position.coords.longitude; // 經度
+        }
+
+        function showError(error) {
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    x.innerHTML = "使用者拒絕了定位請求。"
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    x.innerHTML = "位置資訊無法取得。"
+                    break;
+                case error.TIMEOUT:
+                    x.innerHTML = "請求定位超時。"
+                    break;
+                case error.UNKNOWN_ERROR:
+                    x.innerHTML = "發生未知錯誤。"
+                    break;
+            }
+        }
+        let mediaRecorder;
+        let audioChunks = [];
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
+
+        const filenameElement = document.getElementById('filename');
+        const messageElement = document.getElementById('message');
+        const resultElement = document.getElementById('result');
+        let URL_1 = ""
+        window.onload = async function () {
+
+            const url = new URL(
+                "https://raw.githubusercontent.com/NetZeroCEP/frogapi/refs/heads/main/main.txt"
+            );
+
+            url.searchParams.set("t", Date.now());
+
+            try {
+
+                // 先取得 URL
+                const res = await fetch(url, {
+                    cache: "no-store"
+                });
+
+                const data = await res.text();
+                URL_1 = data.trim();
+
+                console.log("URL_1:", URL_1);
+
+
+                // 等 URL_1 確定後，再呼叫 /classes
+                const classesRes = await fetch(`${URL_1}/classes`, {
+                    method: "GET",
+                    headers: {
+                        "ngrok-skip-browser-warning": "69420"
+                    }
+                });
+
+                const classesData = await classesRes.json();
+
+                console.log("classes:", classesData);
+
+                classesData.forEach(item => {
+                    const option = document.createElement("option");
+
+                    option.value = item;
+                    option.textContent = item;
+
+                    categorySelect.appendChild(option);
+                });
+
+
+            } catch (error) {
+
+                console.error("發生錯誤：", error);
+
+            }
+        };
+        // 開始錄音
+        startBtn.onclick = async () => {
+            getLocation()
+            resultElement.textContent = '';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true
+                });
+
+                // 使用瀏覽器支援的錄音格式
+                let mimeType = 'audio/webm';
+
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    mimeType = 'audio/ogg';
+                }
+
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: mimeType
+                });
+
+                audioChunks = [];
+
+                // 收集錄音資料
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                // 錄音停止
+                mediaRecorder.onstop = async () => {
+
+                    const audioBlob = new Blob(audioChunks, {
+                        type: mimeType
+                    });
+
+                    // 播放錄音
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+
+                    // 建立 FormData
+                    const formData = new FormData();
+
+                    formData.append(
+                        'audio',
+                        audioBlob,
+                        'recording.webm',
+                    );
+
+                    formData.append('lat', lat);
+                    formData.append('lon', lon);
+
+                    try {
+                        // POST 到 Flask
+                        const response = await fetch(`${URL_1}/upload`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: { "ngrok-skip-browser-warning": "69420" }
+                        });
+
+                        const result = await response.json();
+
+                        console.log(result);
+
+                        filenameElement.textContent = result.filename || '';
+                        messageElement.textContent = result.message || '';
+                        resultElement.textContent = result.result || '';
+
+                    } catch (error) {
+                        console.error('上傳錯誤：', error);
+                        alert('無法連線到 Flask');
+                        filenameElement.textContent = '';
+                        messageElement.textContent = '無法連線到 Flask';
+                        resultElement.textContent = '錯誤';
+                    }
+
+                    // 關閉麥克風
+                    mediaRecorder.stream.getTracks().forEach(track => {
+                        track.stop();
+                    });
+
+                    audioChunks = [];
+                };
+
+                // 開始錄音
+                mediaRecorder.start();
+
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+
+                console.log('開始錄音');
+
+            } catch (err) {
+                console.error(err);
+                alert('無法存取麥克風，請確認權限已開啟！');
+            }
+        };
+
+
+        // 停止錄音
+        stopBtn.onclick = async () => {
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+
+            console.log('停止錄音');
+            try {
+                const classesRes = await fetch(`${URL_1}/classes`, {
+                    method: "GET",
+                    headers: {
+                        "ngrok-skip-browser-warning": "69420"
+                    }
+                });
+
+                const classesData = await classesRes.json();
+
+                console.log("classes:", classesData);
+                categorySelect.innerHTML = ""
+                categorySelect.innerHTML += `<option value="">
+                請選擇
+            </option>`
+                classesData.forEach(item => {
+                    const option = document.createElement("option");
+
+                    option.value = item;
+                    option.textContent = item;
+
+                    categorySelect.appendChild(option);
+                });
+
+
+            } catch (error) {
+
+                console.error("發生錯誤：", error);
+
+            }
+        };
+    </script>
+</body>
+
+</html>
